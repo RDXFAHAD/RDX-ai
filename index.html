@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#070817">
+<title>RDX AI — Fahad Ashraf</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="app">
+ <aside class="sidebar">
+  <div class="brand">RDX AI<small>YOUR AI WORKSPACE</small></div>
+  <button class="new-chat" id="newChatBtn">＋ New Chat</button>
+  <nav class="nav">
+   <button class="active" data-page="chat"><span class="ico">✦</span><span class="label">Chat</span></button>
+   <button data-page="image"><span class="ico">▧</span><span class="label">Image Studio</span></button>
+   <button data-page="video"><span class="ico">▶</span><span class="label">Video Studio</span></button>
+   <button data-page="plans"><span class="ico">♛</span><span class="label">Premium Plans</span></button>
+  </nav>
+  <div class="history-area">
+   <h4>CHAT HISTORY</h4>
+   <div id="chatHistory"></div>
+  </div>
+  <div class="side-spacer"></div>
+  <div class="side-bottom">
+   <button data-page="settings"><span class="ico">⚙</span><span class="label">Settings</span></button>
+  </div>
+  <div class="creator">Made with <span style="color:#ed8bdc">♥</span> by<br><strong>Fahad Ashraf</strong></div>
+ </aside>
+
+ <main class="main">
+  <header class="topbar">
+   <div class="top-title"><b>RDX AI</b><span>· <span id="pageTitle">Assistant</span></span></div>
+   <div class="status"><i class="dot"></i> AI workspace</div>
+  </header>
+
+  <section class="content">
+   <div id="chatPage" class="chat-page page active">
+    <div class="welcome" id="welcome">
+     <div class="orb">✦</div>
+     <h1>Meet your ideas with <span class="gradient">RDX AI</span></h1>
+     <p>Ask anything. Create something. Make your next idea happen.</p>
+     <div class="suggestions">
+      <button data-prompt="Explain something simply">Explain something simply</button>
+      <button data-prompt="Write a creative story">Write a creative story</button>
+      <button data-prompt="Help me build a project">Help me build a project</button>
+     </div>
+    </div>
+    <div class="messages" id="messages"></div>
+    <div class="composer-wrap">
+     <div id="imagePreview" class="image-preview" hidden>
+      <img id="previewImg" alt="Selected photo preview">
+      <span id="previewName"></span>
+      <button id="removeImageBtn" title="Remove attachment">×</button>
+     </div>
+     <div class="composer">
+      <button class="attach" id="attachBtn" title="Upload photo or file">＋</button>
+      <input id="fileInput" type="file" accept="image/*,.pdf,.txt,.doc,.docx" hidden>
+      <textarea id="prompt" rows="1" placeholder="Message RDX AI..." aria-label="Message RDX AI"></textarea>
+      <button class="voice-btn" id="voiceBtn" title="Voice input">🎙</button>
+      <button class="send" id="sendBtn" title="Send">➤</button>
+     </div>
+     <div class="disclaimer">RDX AI can make mistakes. Check important information.</div>
+    </div>
+   </div>
+
+   <section class="panel page" id="imagePage" hidden>
+    <div class="panel-heading"><span class="panel-icon">▧</span><div><h2>Image Studio</h2><p>Turn your imagination into images.</p></div></div>
+    <div class="studio-card">
+     <label for="imagePrompt">Describe your image</label>
+     <textarea id="imagePrompt" class="studio-prompt" placeholder="A beautiful futuristic city at sunset..."></textarea>
+     <div class="studio-options">
+      <div><label for="imageStyle">Image Style</label><select id="imageStyle"><option>Realistic</option><option>3D Animation</option><option>Anime</option><option>Digital Art</option><option>Fantasy</option></select></div>
+      <div><label for="imageRatio">Aspect Ratio</label><select id="imageRatio"><option>1:1 Square</option><option>16:9 Landscape</option><option>9:16 Portrait</option></select></div>
+     </div>
+     <button class="studio-generate" id="generateImageBtn">✦ Generate Image</button>
+    </div>
+    <div class="studio-result"><div class="studio-placeholder">▧</div><strong>Your image will appear here</strong><span>Image generation API is not connected yet.</span></div>
+   </section>
+
+   <section class="panel page" id="videoPage" hidden>
+    <div class="panel-heading"><span class="panel-icon">▶</span><div><h2>Video Studio</h2><p>Bring your stories and ideas to life.</p></div></div>
+    <div class="studio-card">
+     <label for="videoPrompt">Describe your video</label>
+     <textarea id="videoPrompt" class="studio-prompt" placeholder="A cinematic view of mountains with moving clouds..."></textarea>
+     <div class="studio-options">
+      <div><label for="videoDuration">Video Duration</label><select id="videoDuration"><option>5 Seconds</option><option>10 Seconds</option><option>15 Seconds</option></select></div>
+      <div><label for="videoRatio">Video Format</label><select id="videoRatio"><option>16:9 Landscape</option><option>9:16 Portrait</option><option>1:1 Square</option></select></div>
+     </div>
+     <button class="studio-generate" id="generateVideoBtn">▶ Generate Video</button>
+    </div>
+    <div class="studio-result"><div class="studio-placeholder">▶</div><strong>Your video will appear here</strong><span>Video generation API is not connected yet.</span></div>
+   </section>
+
+   <section class="panel page" id="plansPage" hidden>
+    <div class="panel-heading"><span class="panel-icon">♛</span><div><h2>Premium Plans</h2><p>Choose the experience that fits your workflow.</p></div></div>
+    <div class="plans-grid">
+     <div class="plan-card"><span class="plan-tag">START HERE</span><h3>Free Plan</h3><div class="plan-price">$0 <small>/ forever</small></div><p>Basic AI chat experience.</p><ul><li>AI chat access</li><li>Chat history</li><li>Workspace settings</li></ul></div>
+     <div class="plan-card featured"><span class="plan-tag">COMING SOON</span><h3>Pro Plan</h3><div class="plan-price">Soon</div><p>Premium features preview.</p><ul><li>Future creative tools</li><li>Expanded workspace</li><li>More features planned</li></ul></div>
+    </div>
+    <p class="fine-print">Payments and subscriptions are not connected.</p>
+   </section>
+
+   <section class="panel page" id="settingsPage" hidden>
+    <div class="panel-heading"><span class="panel-icon">⚙</span><div><h2>Settings</h2><p>Customize your RDX AI workspace.</p></div></div>
+    <div class="studio-card settings-card">
+     <div class="setting-row"><div><strong>Appearance</strong><span>Choose your workspace theme.</span></div><select id="themeSelect"><option value="dark">Dark Neon</option><option value="light">Light Theme</option></select></div>
+     <div class="setting-row"><div><strong>Language</strong><span>Choose your interface language.</span></div><select id="languageSelect"><option value="en">English</option><option value="ur">Roman Urdu</option></select></div>
+     <div class="setting-row"><div><strong>AI Provider</strong><span>Connected through your local backend.</span></div><b>Gemini API</b></div>
+     <div class="setting-row"><div><strong>Creator</strong><span>About this workspace.</span></div><b>Fahad Ashraf</b></div>
+     <div class="privacy-note">Your API key stays in your local .env file. Never share it.</div>
+    </div>
+   </section>
+  </section>
+ </main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script src="/script.js"></script>
+</body>
+</html>
