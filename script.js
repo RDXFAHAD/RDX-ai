@@ -3,17 +3,14 @@ const messages = $('messages');
 const promptBox = $('prompt');
 const welcome = $('welcome');
 const toastEl = $('toast');
-let busy = false;
-let activeChatId = null;
-let currentMessages = [];
-let lastUserMessage = '';
-let selectedFile = null;
+let busy = false, activeChatId = null, currentMessages = [], lastUserMessage = '';
+let activeController = null;
 
 function toast(message) {
   toastEl.textContent = message;
   toastEl.style.display = 'block';
   clearTimeout(window.rdxToastTimer);
-  window.rdxToastTimer = setTimeout(() => toastEl.style.display = 'none', 2800);
+  window.rdxToastTimer = setTimeout(() => toastEl.style.display = 'none', 2600);
 }
 function getHistory() {
   try { return JSON.parse(localStorage.getItem('rdxChatHistory') || '[]'); }
@@ -24,9 +21,9 @@ function renderHistory() {
   list.innerHTML = '';
   const history = getHistory();
   if (!history.length) {
-    const empty = document.createElement('div');
+    const empty = document.createElement('p');
     empty.className = 'history-empty';
-    empty.textContent = 'Your chats will appear here.';
+    empty.textContent = 'Your conversations will appear here.';
     list.appendChild(empty);
     return;
   }
@@ -43,44 +40,42 @@ function saveHistory() {
   if (!currentMessages.length) return;
   if (!activeChatId) activeChatId = String(Date.now());
   const firstUser = currentMessages.find(m => m.role === 'user');
-  const item = {
-    id: activeChatId,
-    title: (firstUser?.text || 'New chat').slice(0, 42),
-    messages: currentMessages,
-    updated: Date.now()
-  };
-  const next = [item, ...getHistory().filter(x => x.id !== activeChatId)].slice(0, 40);
-  localStorage.setItem('rdxChatHistory', JSON.stringify(next));
+  const item = { id: activeChatId, title: (firstUser?.text || 'New chat').slice(0, 42), messages: currentMessages, updated: Date.now() };
+  localStorage.setItem('rdxChatHistory', JSON.stringify([item, ...getHistory().filter(x => x.id !== activeChatId)].slice(0, 40)));
   renderHistory();
 }
-function addMessage(text, role, withActions = true) {
+function addMessage(text, role, actions = true) {
+  const wrap = document.createElement('article');
+  wrap.className = `message ${role}`;
   const bubble = document.createElement('div');
-  bubble.className = 'message ' + role;
-  const body = document.createElement('div');
-  body.textContent = text;
-  bubble.appendChild(body);
-  if (role === 'assistant' && withActions) addMessageActions(bubble, text);
-  messages.appendChild(bubble);
-  messages.scrollTop = messages.scrollHeight;
-  return bubble;
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+  wrap.appendChild(bubble);
+  if (role === 'assistant' && actions) addMessageActions(wrap, text);
+  messages.appendChild(wrap);
+  $('chatScroll').scrollTop = $('chatScroll').scrollHeight;
+  return wrap;
 }
-function addMessageActions(bubble, text) {
-  const actions = document.createElement('div');
-  actions.className = 'message-actions';
+function addMessageActions(wrap, text) {
+  const bar = document.createElement('div');
+  bar.className = 'message-actions';
   const copy = document.createElement('button');
   copy.textContent = 'Copy';
   copy.onclick = async () => {
-    try { await navigator.clipboard.writeText(text); toast('Copied!'); }
-    catch { toast('Copy is not available in this browser.'); }
+    try { await navigator.clipboard.writeText(text); toast('Copied to clipboard'); }
+    catch { toast('Copy is not available in this browser'); }
   };
   const read = document.createElement('button');
   read.textContent = 'Read aloud';
   read.onclick = () => speakText(text);
+  const stop = document.createElement('button');
+  stop.textContent = 'Stop voice';
+  stop.onclick = stopSpeaking;
   const regen = document.createElement('button');
   regen.textContent = 'Regenerate';
   regen.onclick = regenerate;
-  actions.append(copy, read, regen);
-  bubble.appendChild(actions);
+  bar.append(copy, read, stop, regen);
+  wrap.appendChild(bar);
 }
 function renderConversation() {
   messages.innerHTML = '';
@@ -88,174 +83,124 @@ function renderConversation() {
   currentMessages.forEach(m => addMessage(m.text, m.role, m.role === 'assistant'));
 }
 function setPage(page) {
-  const pageMap = {
-    chat: ['chatPage', 'Assistant'],
-    image: ['imagePage', 'Image Studio'],
-    video: ['videoPage', 'Video Studio'],
-    plans: ['plansPage', 'Premium Plans'],
-    settings: ['settingsPage', 'Settings']
-  };
-  Object.entries(pageMap).forEach(([key, [id]]) => {
-    $(id).hidden = key !== page;
-  });
-  document.querySelectorAll('[data-page]').forEach(button => {
-    button.classList.toggle('active', button.dataset.page === page);
-  });
-  $('pageTitle').textContent = pageMap[page][1];
+  const map = { chat:['chatPage','Chat'], image:['imagePage','Image studio'], video:['videoPage','Video studio'], settings:['settingsPage','Settings'] };
+  Object.entries(map).forEach(([key, [id]]) => { $(id).hidden = key !== page; });
+  document.querySelectorAll('[data-page]').forEach(btn => btn.classList.toggle('active', btn.dataset.page === page));
+  $('pageTitle').textContent = map[page][1];
+  $('sidebar').classList.remove('open');
 }
 function newChat() {
-  activeChatId = null;
-  currentMessages = [];
-  lastUserMessage = '';
-  messages.innerHTML = '';
-  welcome.hidden = false;
-  promptBox.value = '';
-  promptBox.style.height = '43px';
-  clearAttachment();
-  setPage('chat');
-  renderHistory();
-  promptBox.focus();
+  stopSpeaking();
+  activeChatId = null; currentMessages = []; lastUserMessage = '';
+  messages.innerHTML = ''; welcome.hidden = false;
+  promptBox.value = ''; promptBox.style.height = '42px';
+  setPage('chat'); renderHistory(); promptBox.focus();
 }
 function loadChat(id) {
-  const item = getHistory().find(chat => chat.id === id);
+  const item = getHistory().find(x => x.id === id);
   if (!item) return;
-  activeChatId = item.id;
-  currentMessages = item.messages || [];
-  lastUserMessage = [...currentMessages].reverse().find(m => m.role === 'user')?.text || '';
-  renderConversation();
-  setPage('chat');
+  activeChatId = item.id; currentMessages = item.messages || [];
+  lastUserMessage = [...currentMessages].reverse().find(x => x.role === 'user')?.text || '';
+  renderConversation(); setPage('chat');
+}
+function selectedLanguageInstruction() {
+  return $('languageSelect').value === 'ur'
+    ? 'Reply in simple Roman Urdu using English letters only. Do not use Urdu or Hindi script unless the user specifically asks for it.\\n\\n'
+    : 'Reply in clear, simple English unless the user asks for another language.\\n\\n';
 }
 async function sendMessage(override) {
-  const message = (override ?? promptBox.value).trim();
-  if (!message || busy) return;
-  busy = true;
-  lastUserMessage = message;
+  const text = (override ?? promptBox.value).trim();
+  if (!text || busy) return;
+  stopSpeaking();
+  busy = true; lastUserMessage = text;
   welcome.hidden = true;
-  currentMessages.push({ role: 'user', text: message });
-  addMessage(message, 'user', false);
-  promptBox.value = '';
-  promptBox.style.height = '43px';
-  saveHistory();
+  currentMessages.push({ role:'user', text });
+  addMessage(text, 'user', false);
+  promptBox.value = ''; promptBox.style.height = '42px'; saveHistory();
   const waiting = addMessage('Thinking…', 'assistant', false);
   waiting.classList.add('thinking');
-
+  $('sendBtn').disabled = true;
+  activeController = new AbortController();
   try {
     const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message })
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ message: selectedLanguageInstruction() + text }),
+      signal: activeController.signal
     });
     const data = await response.json().catch(() => ({}));
     waiting.classList.remove('thinking');
     let reply = data.reply || data.error || 'The server returned an empty response.';
-    if (!response.ok && Array.isArray(data.details) && data.details.length) {
-      reply += '\\n\\nTechnical details:\\n' + data.details.join('\\n');
-    }
-    waiting.firstElementChild.textContent = reply;
+    if (!response.ok && Array.isArray(data.details) && data.details.length) reply += '\\n\\nDetails:\\n' + data.details.join('\\n');
+    waiting.querySelector('.bubble').textContent = reply;
     addMessageActions(waiting, reply);
-    currentMessages.push({ role: 'assistant', text: reply });
-    saveHistory();
-    if (!response.ok) console.error('RDX AI server response:', data);
+    currentMessages.push({ role:'assistant', text:reply }); saveHistory();
+    if ($('autoSpeak').checked) speakText(reply);
+    if (!response.ok) console.error('RDX AI response:', data);
   } catch (error) {
     waiting.classList.remove('thinking');
-    waiting.firstElementChild.textContent = 'Could not connect to RDX AI. Make sure the Flask server is running at http://127.0.0.1:5000.';
+    waiting.querySelector('.bubble').textContent = error.name === 'AbortError' ? 'Request cancelled.' : 'Could not connect to RDX AI. Please try again.';
     console.error(error);
   } finally {
-    busy = false;
-    promptBox.focus();
+    busy = false; activeController = null; $('sendBtn').disabled = false; promptBox.focus();
   }
 }
 function regenerate() {
   if (!lastUserMessage || busy) return;
   if (currentMessages.at(-1)?.role === 'assistant') currentMessages.pop();
-  const lastBubble = messages.lastElementChild;
-  if (lastBubble?.classList.contains('assistant')) lastBubble.remove();
+  const last = messages.lastElementChild;
+  if (last?.classList.contains('assistant')) last.remove();
   sendMessage(lastUserMessage);
 }
 function speakText(text) {
-  if (!('speechSynthesis' in window)) return toast('Read aloud is not supported in this browser.');
+  if (!('speechSynthesis' in window)) return toast('Voice playback is not supported in this browser.');
   speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'en-US';
+  utterance.lang = $('languageSelect').value === 'ur' ? 'ur-PK' : 'en-US';
+  utterance.onstart = () => $('stopSpeakingBtn').disabled = false;
+  utterance.onend = utterance.onerror = () => $('stopSpeakingBtn').disabled = true;
   speechSynthesis.speak(utterance);
 }
-function clearAttachment() {
-  selectedFile = null;
-  $('fileInput').value = '';
-  $('imagePreview').hidden = true;
-  $('previewImg').removeAttribute('src');
-  $('previewName').textContent = '';
+function stopSpeaking() {
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  $('stopSpeakingBtn').disabled = true;
 }
-$('newChatBtn').addEventListener('click', newChat);
-document.querySelectorAll('[data-page]').forEach(button => {
-  button.addEventListener('click', () => setPage(button.dataset.page));
+function clearHistory() {
+  if (!confirm('Delete all chat history saved in this browser?')) return;
+  localStorage.removeItem('rdxChatHistory');
+  activeChatId = null; currentMessages = []; lastUserMessage = '';
+  messages.innerHTML = ''; welcome.hidden = false; renderHistory(); toast('Chat history cleared');
+}
+$('newChatBtn').onclick = $('topNewChat').onclick = newChat;
+document.querySelectorAll('[data-page]').forEach(btn => btn.addEventListener('click', () => setPage(btn.dataset.page)));
+$('mobileMenuBtn').onclick = () => $('sidebar').classList.toggle('open');
+$('sendBtn').onclick = () => sendMessage();
+$('stopSpeakingBtn').onclick = stopSpeaking;
+promptBox.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
-$('sendBtn').addEventListener('click', () => sendMessage());
-promptBox.addEventListener('keydown', event => {
-  if (event.key === 'Enter' && !event.shiftKey) {
-    event.preventDefault();
-    sendMessage();
-  }
-});
-promptBox.addEventListener('input', () => {
-  promptBox.style.height = '43px';
-  promptBox.style.height = Math.min(promptBox.scrollHeight, 145) + 'px';
-});
-document.querySelectorAll('[data-prompt]').forEach(button => {
-  button.addEventListener('click', () => {
-    promptBox.value = button.dataset.prompt;
-    promptBox.focus();
-  });
-});
-$('attachBtn').addEventListener('click', () => $('fileInput').click());
-$('fileInput').addEventListener('change', event => {
-  selectedFile = event.target.files?.[0] || null;
-  if (!selectedFile) return;
-  $('previewName').textContent = selectedFile.name;
-  $('imagePreview').hidden = false;
-  if (selectedFile.type.startsWith('image/')) {
-    const reader = new FileReader();
-    reader.onload = e => $('previewImg').src = e.target.result;
-    reader.readAsDataURL(selectedFile);
-  } else {
-    $('previewImg').removeAttribute('src');
-  }
-  toast('Attachment preview ready. File upload to AI is not connected yet.');
-});
-$('removeImageBtn').addEventListener('click', clearAttachment);
-$('voiceBtn').addEventListener('click', () => {
+promptBox.addEventListener('input', () => { promptBox.style.height = '42px'; promptBox.style.height = Math.min(promptBox.scrollHeight, 145) + 'px'; });
+document.querySelectorAll('[data-prompt]').forEach(btn => btn.onclick = () => { promptBox.value = btn.dataset.prompt; promptBox.focus(); });
+$('voiceBtn').onclick = () => {
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Recognition) return toast('Voice typing is not supported in this browser.');
   const recognition = new Recognition();
-  recognition.lang = $('languageSelect')?.value === 'ur' ? 'ur-PK' : 'en-US';
+  recognition.lang = $('languageSelect').value === 'ur' ? 'ur-PK' : 'en-US';
   recognition.interimResults = false;
-  recognition.onresult = event => {
-    promptBox.value += (promptBox.value ? ' ' : '') + event.results[0][0].transcript;
-    promptBox.focus();
-  };
+  recognition.onresult = e => { promptBox.value += (promptBox.value ? ' ' : '') + e.results[0][0].transcript; promptBox.focus(); };
   recognition.onerror = () => toast('Microphone permission or voice recognition failed.');
-  recognition.start();
-  toast('Listening… speak now.');
-});
-$('generateImageBtn').addEventListener('click', () => {
-  if (!$('imagePrompt').value.trim()) return toast('Please describe the image first.');
-  toast('Image generation API is not connected yet.');
-});
-$('generateVideoBtn').addEventListener('click', () => {
-  if (!$('videoPrompt').value.trim()) return toast('Please describe the video first.');
-  toast('Video generation API is not connected yet.');
-});
-$('themeSelect').addEventListener('change', event => {
-  document.body.classList.toggle('light', event.target.value === 'light');
-  localStorage.setItem('rdxTheme', event.target.value);
-});
-$('languageSelect').addEventListener('change', event => {
-  localStorage.setItem('rdxLanguage', event.target.value);
-  toast(event.target.value === 'ur' ? 'Roman Urdu selected for voice typing.' : 'English selected.');
-});
+  recognition.start(); $('voiceStatus').textContent = 'Listening… speak now'; toast('Listening…');
+  recognition.onend = () => $('voiceStatus').textContent = 'Enter to send · Shift + Enter for new line';
+};
+$('themeSelect').onchange = e => { document.body.classList.toggle('light', e.target.value === 'light'); localStorage.setItem('rdxTheme', e.target.value); };
+$('languageSelect').onchange = e => { localStorage.setItem('rdxLanguage', e.target.value); toast(e.target.value === 'ur' ? 'Roman Urdu replies selected' : 'English replies selected'); };
+$('clearHistoryBtn').onclick = $('settingsClearHistory').onclick = clearHistory;
+$('generateImageBtn').onclick = () => toast($('imagePrompt').value.trim() ? 'Image generation is not connected yet.' : 'Please describe your image first.');
+$('generateVideoBtn').onclick = () => toast($('videoPrompt').value.trim() ? 'Video generation is not connected yet.' : 'Please describe your video first.');
 const savedTheme = localStorage.getItem('rdxTheme') || 'dark';
 document.body.classList.toggle('light', savedTheme === 'light');
 $('themeSelect').value = savedTheme;
-$('languageSelect').value = localStorage.getItem('rdxLanguage') || 'en';
-renderHistory();
-setPage('chat');
+$('languageSelect').value = localStorage.getItem('rdxLanguage') || 'ur';
+$('autoSpeak').checked = localStorage.getItem('rdxAutoSpeak') === 'true';
+$('autoSpeak').onchange = e => localStorage.setItem('rdxAutoSpeak', String(e.target.checked));
+renderHistory(); setPage('chat');
